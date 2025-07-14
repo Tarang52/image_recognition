@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Image Classification System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" />
+  <style>
+    body {
+      background-color: #0f1117;
+      color: #ffffff;
+      scroll-behavior: smooth;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 4px;
+    }
+    .upload-area {
+      border: 2px dashed #2d3748;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+    }
+    .upload-area:hover {
+      border-color: #0891b2;
+      background-color: rgba(8, 145, 178, 0.1);
+    }
+  </style>
+</head>
+<body>
+  <div class="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+
+    <!-- System Status Bar -->
+    <div class="bg-[#1a1f2e] rounded-lg p-4 mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div class="flex items-center space-x-4 flex-wrap">
+        <i class="bi bi-display text-gray-400"></i>
+        <span class="text-gray-400">SYSTEM_STATUS</span>
+        <div class="flex items-center space-x-4">
+          <div class="flex items-center">
+            <span class="status-dot bg-green-500"></span>
+            <span class="text-green-500">API_ONLINE</span>
+          </div>
+          <div class="flex items-center">
+            <span class="status-dot bg-blue-500"></span>
+            <span class="text-blue-500">AI_READY</span>
+          </div>
+          <div class="flex items-center">
+            <span class="status-dot bg-purple-500"></span>
+            <span class="text-purple-500">DB_CONNECTED</span>
+          </div>
+        </div>
+      </div>
+      <div class="flex space-x-4">
+        <div class="bg-[#1e2433] px-4 py-2 rounded">
+          <span class="text-gray-400">CLASSIFICATIONS:</span>
+          <span class="text-white" id="classificationCount">0</span>
+        </div>
+        <div class="bg-[#1e2433] px-4 py-2 rounded">
+          <span class="text-gray-400">UPTIME:</span>
+          <span class="text-white">99.9%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Upload + Info Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Upload -->
+      <div class="md:col-span-2 bg-[#1a1f2e] rounded-lg p-6">
+        <div class="mb-4">
+          <h2 class="text-xl font-bold mb-2">IMAGE_UPLOAD_MODULE</h2>
+          <p class="text-gray-400 text-sm">neural_network.classify(mechanical_part_image) → prediction_result</p>
+          <div class="flex flex-wrap gap-4 mt-2">
+            <span class="text-cyan-500"><i class="bi bi-cpu"></i> AI_POWERED</span>
+            <span class="text-green-500"><i class="bi bi-activity"></i> REAL_TIME</span>
+            <span class="text-yellow-500"><i class="bi bi-lightning"></i> HIGH_ACCURACY</span>
+          </div>
+        </div>
+
+        <div class="upload-area p-6 sm:p-8 text-center cursor-pointer" id="dropZone">
+          <i class="bi bi-image text-6xl text-cyan-500 mb-4"></i>
+          <h3 class="text-xl mb-2">UPLOAD_MECHANICAL_PART</h3>
+          <p class="text-gray-400 mb-2">drag_and_drop || click_to_select</p>
+          <p class="text-gray-500 text-sm mb-4">SUPPORTED: JPG, PNG, WEBP • MAX_SIZE: 10MB</p>
+          <button class="bg-cyan-500 hover:bg-cyan-600 text-white px-6 py-3 rounded-md text-base w-full sm:w-auto transition-colors" onclick="fileInput.click()">
+            SELECT_FILE()
+          </button>
+          <input type="file" id="fileInput" class="hidden" accept=".jpg,.jpeg,.png,.webp" />
+        </div>
+
+        <!-- Image Preview -->
+        <div id="previewBox" class="hidden mt-6 text-center">
+          <h3 class="text-md text-gray-400 mb-2">IMAGE_PREVIEW</h3>
+          <img id="previewImage" class="mx-auto w-full max-w-xs sm:max-w-sm md:max-w-md rounded-lg border border-cyan-700 shadow-md" />
+        </div>
+
+        <!-- Result Box -->
+        <div id="result" class="mt-6 hidden bg-[#232836] rounded p-4 text-center border border-cyan-700">
+          <h3 class="text-xl font-semibold mb-2 text-cyan-400">🔍 Prediction Result</h3>
+          <p id="resultClass" class="text-lg text-white"></p>
+          <p id="resultConfidence" class="text-sm text-gray-400"></p>
+        </div>
+      </div>
+
+      <!-- Sidebar Info -->
+      <div class="space-y-6">
+        <div class="bg-[#1a1f2e] rounded-lg p-6">
+          <h3 class="text-lg mb-4">SYSTEM_INFO</h3>
+          <div class="space-y-4">
+            <div class="bg-[#232836] p-4 rounded">
+              <p class="text-gray-400 text-sm">MODEL_VERSION</p>
+              <p class="text-cyan-500">v2.1.3-stable</p>
+            </div>
+            <div class="bg-[#232836] p-4 rounded">
+              <p class="text-gray-400 text-sm">ACCURACY_RATE</p>
+              <p class="text-white">97.57%</p>
+            </div>
+            <div class="bg-[#232836] p-4 rounded">
+              <p class="text-gray-400 text-sm">AVG_RESPONSE</p>
+              <p class="text-yellow-500">2.3 seconds</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="mt-20 bg-[#1a1f2e] py-6 text-center text-gray-500 text-sm px-4">
+    © <span id="year"></span> T_Web Technologies. All rights reserved.
+  </footer>
+  <!-- Script -->
+  <script>
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+  const resultBox = document.getElementById('result');
+  const resultClass = document.getElementById('resultClass');
+  const resultConfidence = document.getElementById('resultConfidence');
+  const previewBox = document.getElementById('previewBox');
+  const previewImage = document.getElementById('previewImage');
+
+  // Prevent default drag behaviors
+  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    dropZone.addEventListener(eventName, e => {
+      e.preventDefault();
+      e.stopPropagation();
+    }, false);
+  });
+
+  ['dragenter', 'dragover'].forEach(e =>
+    dropZone.addEventListener(e, () => dropZone.classList.add('bg-[#1e2433]'))
+  );
+  ['dragleave', 'drop'].forEach(e =>
+    dropZone.addEventListener(e, () => dropZone.classList.remove('bg-[#1e2433]'))
+  );
+
+  dropZone.addEventListener('drop', e => {
+    const files = e.dataTransfer.files;
+    handleFiles(files);
+  });
+
+  fileInput.addEventListener('change', function () {
+    handleFiles(this.files);
+  });
+
+  async function handleFiles(files) {
+    const file = files[0];
+    if (!file || file.size > 10 * 1024 * 1024) {
+      alert("File too large. Max 10MB allowed.");
+      return;
+    }
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      previewImage.src = e.target.result;
+      previewBox.classList.remove("hidden");
+    };
+    reader.readAsDataURL(file);
+
+    // Send to backend
+    const formData = new FormData();
+    formData.append("file", file);
+
+    resultBox.classList.remove("hidden");
+    resultClass.innerHTML = "🧠 Processing...";
+    resultConfidence.innerHTML = ``;
+
+    try {
+      const res = await fetch("/predict", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (data.error) throw new Error(data.error);
+
+      resultClass.innerHTML = `<strong>Class:</strong> ${data.class}`;
+      resultConfidence.innerHTML = `<strong>Confidence:</strong> ${data.confidence}%`;
+
+      const countElem = document.getElementById("classificationCount");
+      countElem.textContent = parseInt(countElem.textContent) + 1;
+    } catch (err) {
+      resultClass.innerHTML = "❌ Error! Backend not responding.";
+      resultConfidence.innerHTML = ``;
+      console.error("Prediction error:", err);
+    }
+  }
+
+  // Auto update year
+  document.getElementById("year").textContent = new Date().getFullYear();
+</script>
+</body>
+</html>
