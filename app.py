@@ -1,80 +1,94 @@
-from flask import Flask, request, jsonify, send_from_directory
+"""
+app.py – Flask + MobileNetV3 API
+Works locally (python app.py) and on Railway with Procfile:  web: gunicorn app:app
+"""
+
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import tensorflow as tf
-from tensorflow.keras.applications.mobilenet_v3 import preprocess_input
 from tensorflow.keras.preprocessing import image
+from tensorflow.keras.applications.mobilenet_v3 import preprocess_input
 import numpy as np
 import os
 from pathlib import Path
+import traceback
 
 # ───── CONFIG ─────
-MODEL_PATH = "checkpoints/mobilenetv3_enhanced/mobilenetv3_enhanced.keras"
-LABELS_PATH = "checkpoints/mobilenetv3_enhanced/labels.txt"
-UPLOAD_FOLDER = "uploads"
-IMG_SIZE = (224, 224)
+MODEL_PATH  = Path("checkpoints/mobilenetv3_enhanced/mobilenetv3_enhanced.keras")
+LABELS_PATH = Path("checkpoints/mobilenetv3_enhanced/labels.txt")
+UPLOAD_DIR  = Path("uploads")
+IMG_SIZE    = (224, 224)
 
 # ───── INIT ─────
 app = Flask(__name__, static_folder=".", static_url_path="/")
 CORS(app)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-Path(UPLOAD_FOLDER).mkdir(exist_ok=True)
+UPLOAD_DIR.mkdir(exist_ok=True)
 
-# ───── LOAD MODEL + LABELS ─────
-print("🔁 Loading model...")
+# ───── LOAD MODEL ─────
+print("🔁  Loading model…")
 try:
-    model = tf.keras.models.load_model(MODEL_PATH)
-    with open(LABELS_PATH, "r") as f:
-        CLASS_NAMES = f.read().splitlines()
-    print("✅ Model loaded. Classes:", CLASS_NAMES)
+    if not MODEL_PATH.exists():
+        raise FileNotFoundError(f"Model file not found → {MODEL_PATH}")
+    if not LABELS_PATH.exists():
+        raise FileNotFoundError(f"Labels file not found → {LABELS_PATH}")
+
+    model = tf.keras.models.load_model(str(MODEL_PATH))
+    CLASS_NAMES = LABELS_PATH.read_text().splitlines()
+    print("✅  Model & labels loaded. Classes:", CLASS_NAMES)
 except Exception as e:
-    print("❌ Model load failed:", e)
-    model = None
-    CLASS_NAMES = []
+    print("❌  Failed to load model:", e)
+    model, CLASS_NAMES = None, []
+    # We keep running so /health still works
 
 # ───── ROUTES ─────
 @app.route("/")
-def home():
+def index():
+    """Serve the single-page app (index.html)."""
     return app.send_static_file("index.html")
+
+@app.route("/health")
+def health():
+    """Railway pings this to check liveness."""
+    status = "up" if model else "model_load_failed"
+    return jsonify({"status": status})
 
 @app.route("/predict", methods=["POST"])
 def predict():
     if model is None:
-        return jsonify({"error": "Model not loaded"}), 500
+        return jsonify({"error": "Model not loaded on server"}), 500
 
-    if "file" not in request.files:
-        return jsonify({"error": "No file provided"}), 400
+    if "file" not in request.files or request.files["file"].filename == "":
+        return jsonify({"error": "No image file provided"}), 400
 
-    file = request.files["file"]
-    if file.filename == "":
-        return jsonify({"error": "No filename"}), 400
-
-    file_path = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
-    file.save(file_path)
+    file_obj = request.files["file"]
+    file_path = UPLOAD_DIR / file_obj.filename
+    file_obj.save(file_path)
 
     try:
-        # Load and preprocess image
+        # ── preprocess ──
         img = image.load_img(file_path, target_size=IMG_SIZE)
-        img_array = image.img_to_array(img)
-        img_array = preprocess_input(img_array)
-        img_batch = np.expand_dims(img_array, axis=0)
+        x   = preprocess_input(image.img_to_array(img))
+        x   = np.expand_dims(x, 0)
 
-        # Predict
-        preds = model.predict(img_batch)
-        pred_idx = np.argmax(preds[0])
-        confidence = float(preds[0][pred_idx]) * 100
-        label = CLASS_NAMES[pred_idx]
+        # ── predict ──
+        probs  = model.predict(x)[0]
+        idx    = int(np.argmax(probs))
+        label  = CLASS_NAMES[idx]
+        conf   = float(probs[idx]) * 100
 
-        return jsonify({
-            "class": label,
-            "confidence": f"{confidence:.2f}"
-        })
-
-    except Exception as e:
-        import traceback
+        return jsonify({"class": label, "confidence": f"{conf:.2f}"})
+    except Exception as err:
+        print("❌  PREDICT ERROR:", err)
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(err)}), 500
+    finally:
+        # Delete the uploaded image to save disk space
+        try:
+            file_path.unlink(missing_ok=True)
+        except Exception:
+            pass
 
-# ───── LOCAL DEV ONLY ─────
+# ───── LOCAL DEV ENTRYPOINT ─────
 if __name__ == "__main__":
-    print("🧪 Running locally with Flask dev server.")
-    app.run(debug=True)
+    print("🧪  Running with Flask dev server (localhost:5000)")
+    app.run(debug=True, port=5000)
