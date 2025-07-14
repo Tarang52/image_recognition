@@ -21,10 +21,15 @@ Path(UPLOAD_FOLDER).mkdir(exist_ok=True)
 
 # ───── LOAD MODEL + LABELS ─────
 print("🔁 Loading model...")
-model = tf.keras.models.load_model(MODEL_PATH)
-with open(LABELS_PATH, "r") as f:
-    CLASS_NAMES = f.read().splitlines()
-print("✅ Model loaded. Classes:", CLASS_NAMES)
+try:
+    model = tf.keras.models.load_model(MODEL_PATH)
+    with open(LABELS_PATH, "r") as f:
+        CLASS_NAMES = f.read().splitlines()
+    print("✅ Model loaded. Classes:", CLASS_NAMES)
+except Exception as e:
+    print("❌ Model load failed:", e)
+    model = None
+    CLASS_NAMES = []
 
 # ───── ROUTES ─────
 @app.route("/")
@@ -33,6 +38,9 @@ def home():
 
 @app.route("/predict", methods=["POST"])
 def predict():
+    if model is None:
+        return jsonify({"error": "Model not loaded"}), 500
+
     if "file" not in request.files:
         return jsonify({"error": "No file provided"}), 400
 
@@ -62,8 +70,11 @@ def predict():
         })
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-# ───── START ─────
+# ───── LOCAL DEV ONLY ─────
 if __name__ == "__main__":
+    print("🧪 Running locally with Flask dev server.")
     app.run(debug=True)
